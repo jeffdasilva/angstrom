@@ -36,7 +36,7 @@ ANGSTROM_TOP=$(pwd -P)/${ANGSTROM_BASE_DIR}
 #ANGSTROM_MACH=socfpga_cyclone5
 ANGSTROM_MACH=socfpga
 ANGSTROM_MACH_BASELINE=cyclone5
-ANGSTROM_PUBLISH_DIR=/home/jdasilva/doozynas/www/angstrom/${ANGSTROM_VER}
+ANGSTROM_PUBLISH_DIR=${HOME}/doozynas/www/angstrom/${ANGSTROM_VER}
 
 if [ -f "${ANGSTROM_PUBLISH_DIR}/${THIS_SCRIPT}" ]; then
     diff ${ANGSTROM_PUBLISH_DIR}/${THIS_SCRIPT} ${THIS_DIR}/${THIS_SCRIPT} || true
@@ -130,9 +130,11 @@ fi
 
 ##############
 # Add support for memtool
-mkdir -p sources/meta-altera/recipes-devtools
-rm -rf sources/meta-altera/recipes-devtools/memtool
-cp -rvf ~/doozynas/socfpga/memtool/meta-altera/recipes-devtools/memtool sources/meta-altera/recipes-devtools/
+if [ -d ~/doozynas/socfpga/memtool/meta-altera/recipes-devtools/memtool ]; then
+    mkdir -p sources/meta-altera/recipes-devtools
+    rm -rf sources/meta-altera/recipes-devtools/memtool
+    cp -rvf ~/doozynas/socfpga/memtool/meta-altera/recipes-devtools/memtool sources/meta-altera/recipes-devtools/
+fi
 
 # http://www.gumstix.org/compile-code-on-my-gumstix.html#angstrom
 #
