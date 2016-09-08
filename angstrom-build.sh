@@ -32,11 +32,18 @@ else
     YOCTO_VER=yocto2.0
 fi
 
+
+ENABLE_MTDUTILS_PATCH=$[$(date +%j)%2]
+
 ANGSTROM_TOP=$(pwd -P)/${ANGSTROM_BASE_DIR}
 #ANGSTROM_MACH=socfpga_cyclone5
 ANGSTROM_MACH=socfpga
 ANGSTROM_MACH_BASELINE=cyclone5
 ANGSTROM_PUBLISH_DIR=${HOME}/doozynas/www/angstrom/${ANGSTROM_VER}
+
+if [ "${ENABLE_MTDUTILS_PATCH}" = "1" ]; then
+    ANGSTROM_PUBLISH_DIR=${ANGSTROM_PUBLISH_DIR}.patched
+fi
 
 if [ -f "${ANGSTROM_PUBLISH_DIR}/${THIS_SCRIPT}" ]; then
     diff ${ANGSTROM_PUBLISH_DIR}/${THIS_SCRIPT} ${THIS_DIR}/${THIS_SCRIPT} || true
@@ -305,9 +312,11 @@ fi
 #MACHINE=${ANGSTROM_MACH} bitbake -c clean virtual/kernel
 #MACHINE=${ANGSTROM_MACH} bitbake virtual/kernel
 
-pushd sources/meta-altera
-git apply ../../../fb_381598_mtd_utils.patch
-popd
+if [ "${ENABLE_MTDUTILS_PATCH}" = "1" ]; then
+    pushd sources/meta-altera
+    git apply ../../../fb_381598_mtd_utils.patch
+    popd
+fi
 
 MACHINE=${ANGSTROM_MACH} bitbake console-image
 
