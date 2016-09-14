@@ -33,7 +33,8 @@ else
 fi
 
 
-ENABLE_MTDUTILS_PATCH=$[$(date +%j)%2]
+#ENABLE_MTDUTILS_PATCH=$[$(date +%j)%2]
+ENABLE_MTDUTILS_PATCH=0
 
 ANGSTROM_TOP=$(pwd -P)/${ANGSTROM_BASE_DIR}
 #ANGSTROM_MACH=socfpga_cyclone5
@@ -215,7 +216,8 @@ oprofile uuid memtool\"" >> sources/meta-altera/conf/machine/socfpga.conf
 #echo 'EXTRA_IMAGE_FEATURES = "debug-tweaks dbg-pkgs"' >> sources/meta-altera/conf/machine/include/socfpga.inc
 
 # Aug 22, 2016 to fix sshd issue
-echo 'EXTRA_IMAGE_FEATURES = "debug-tweaks"' >> sources/meta-altera/conf/machine/include/socfpga.inc
+# Sept 13, 2016 allow-empty-password added
+echo 'EXTRA_IMAGE_FEATURES = "allow-empty-password debug-tweaks"' >> sources/meta-altera/conf/machine/include/socfpga.inc
 
 
 ##############
@@ -297,6 +299,8 @@ unset_root_password() {
         > \${IMAGE_ROOTFS}/etc/shadow.new;\\
     mv \${IMAGE_ROOTFS}/etc/shadow.new \${IMAGE_ROOTFS}/etc/shadow ;
 }
+
+EXTRA_IMAGE_FEATURES += "allow-empty-password"
 
 EOF
 
