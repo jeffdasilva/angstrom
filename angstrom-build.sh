@@ -33,8 +33,8 @@ else
 fi
 
 
-#ENABLE_MTDUTILS_PATCH=$[$(date +%j)%2]
-ENABLE_MTDUTILS_PATCH=0
+ENABLE_MTDUTILS_PATCH=$[$(date +%j)%2]
+#ENABLE_MTDUTILS_PATCH=0
 
 ANGSTROM_TOP=$(pwd -P)/${ANGSTROM_BASE_DIR}
 #ANGSTROM_MACH=socfpga_cyclone5
@@ -268,7 +268,11 @@ if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
     sed -i -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(ExecStart=/usr/sbin/connmand -n\\)\\\$#\\1 -I eth0#" \${S}/src/connman.service,' sources/openembedded-core/meta/recipes-connectivity/connman/connman.inc
 else
     #    sed -i.orig -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(ExecStart=.*/connmand -n\\)\\\$#\\1 -I eth0#" \${S}/src/connman.service.in,' sources/openembedded-core/meta/recipes-connectivity/connman/connman.inc
-    sed -i.orig -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(ExecStart=.*/connmand -n\\)\\\$#\\1 -I eth0#" \${B}/src/connman.service,' sources/openembedded-core/meta/recipes-connectivity/connman/connman.inc
+    #sed -i.orig -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(ExecStart=.*/connmand -n\\)\\\$#\\1 -I eth0#" \${B}/src/connman.service,' sources/openembedded-core/meta/recipes-connectivity/connman/connman.inc
+
+    # as documented in [case:404248]
+    sed -i.orig -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(Wants=network.target.*\\)\\\$#\\1\\nConditionKernelCommandLine=!root=/dev/nfs#" \${B}/src/connman.service,' sources/openembedded-core/meta/recipes-connectivity/connman/connman.inc
+
 fi
 
 # qspi boot on rocketboards says to add this
