@@ -222,43 +222,46 @@ echo 'EXTRA_IMAGE_FEATURES = "allow-empty-password debug-tweaks"' >> sources/met
 
 ##############
 
-# Fix Gator init.d [case:208846]
-# sed -i -e 's,\(^[.][ \t]*/etc/init.d/functions.*\),if [ -f /etc/init.d/functions ]; then \1; fi,g' sources/meta-linaro/meta-linaro/recipes-kernel/gator/gator/gator.init
+if [ "${FIX_GATOR_GIT_TAG}" == "1" ]; then
 
-GATOR_GIT_TAG="$(wget -q -O - "https://git.linaro.org/?p=arm/ds5/gator.git" | grep '/arm/ds5/gator.git/commit/' | head -n1 | sed -e 's,.*/arm/ds5/gator.git/commit/\([0-9a-zA-Z]*\).*,\1,g' 2>/dev/null)"
+    # Fix Gator init.d [case:208846]
+    # sed -i -e 's,\(^[.][ \t]*/etc/init.d/functions.*\),if [ -f /etc/init.d/functions ]; then \1; fi,g' sources/meta-linaro/meta-linaro/recipes-kernel/gator/gator/gator.init
 
-#Old Gator Git tag for 5.19 I think...
-#GATOR_GIT_TAG="ba783f1443773505231ac2808c9a3716c3c2f3ae"
-#5.19.1
-#GATOR_GIT_TAG="5e3cabe778188543611a71a59094292fb34c49df"
+    GATOR_GIT_TAG="$(wget -q -O - "https://git.linaro.org/?p=arm/ds5/gator.git" | grep '/arm/ds5/gator.git/commit/' | head -n1 | sed -e 's,.*/arm/ds5/gator.git/commit/\([0-9a-zA-Z]*\).*,\1,g' 2>/dev/null)"
+    
+    #Old Gator Git tag for 5.19 I think...
+    #GATOR_GIT_TAG="ba783f1443773505231ac2808c9a3716c3c2f3ae"
+    #5.19.1
+    #GATOR_GIT_TAG="5e3cabe778188543611a71a59094292fb34c49df"
+    
+    #echo "GATOR_GIT_TAG is ${GATOR_GIT_TAG}"
+    #if [ -z "${GATOR_GIT_TAG}" ]; then
+    #    echo "ERROR: GATOR_GIT_TAG not discovered"
+    #    exit 1
+    #fi
 
-#echo "GATOR_GIT_TAG is ${GATOR_GIT_TAG}"
-#if [ -z "${GATOR_GIT_TAG}" ]; then
-#    echo "ERROR: GATOR_GIT_TAG not discovered"
-#    exit 1
-#fi
+    #sed -i -e "s,^SRCREV=.*,SRCREV=\"${GATOR_GIT_TAG}\"," sources/meta-altera/recipes-devtools/gator/gator_1.0.bb
 
-#sed -i -e "s,^SRCREV=.*,SRCREV=\"${GATOR_GIT_TAG}\"," sources/meta-altera/recipes-devtools/gator/gator_1.0.bb
-if [ -f "sources/meta-linaro/meta-linaro/recipes-kernel/gator/gator_git.bb" ]; then
-    sed -i -e "s,^SRCREV[ \t]*=.*,SRCREV = \"${GATOR_GIT_TAG}\"," sources/meta-linaro/meta-linaro/recipes-kernel/gator/gator_git.bb
+    echo Gator Git Tag is: ${GATOR_GIT_TAG}
+    if [ -z "${GATOR_GIT_TAG}" ]; then
+	echo "ERROR: Gator Git tag is invalid"
+	exit 1
+    fi
+
+    if [ -f "sources/meta-linaro/meta-linaro/recipes-kernel/gator/gator_git.bb" ]; then
+	sed -i -e "s,^SRCREV[ \t]*=.*,SRCREV = \"${GATOR_GIT_TAG}\"," sources/meta-linaro/meta-linaro/recipes-kernel/gator/gator_git.bb
+    fi
+
+    if [ -f "sources/meta-altera/recipes-devtools/gator/gator_1.0.bb" ]; then
+	sed -i \
+	    -e 's,^SRCREV[ \t]*=.*,SRCREV = "${AUTOREV}",' \
+	    -e 's,git://git.linaro.org/git-ro/arm/ds5/gator.git;protocol=http,https://github.com/ARM-software/gator.git;protocol=https,g' \
+	    sources/meta-altera/recipes-devtools/gator/gator_1.0.bb
+    fi
 fi
-
-if [ -f "sources/meta-altera/recipes-devtools/gator/gator_1.0.bb" ]; then
-    sed -i \
-	-e 's,^SRCREV[ \t]*=.*,SRCREV = "${AUTOREV}",' \
-	-e 's,git://git.linaro.org/git-ro/arm/ds5/gator.git;protocol=http,https://github.com/ARM-software/gator.git;protocol=https,g' \
-	sources/meta-altera/recipes-devtools/gator/gator_1.0.bb
-fi
-
-#sed -i \
-#    sources/meta-linaro/meta-linaro/recipes-kernel/gator/gator_git.bb
-#     -e 's,^SRCREV[ \t]*=.*,SRCREV = "${AUTOREV}",' \
-#     -e 's,git://git.linaro.org/arm/ds5/gator.git;protocol=http;branch=linaro,https://github.com/ARM-software/gator.git;protocol=https,g' \
-#    -e 's,^PV[ \t]*=[ \t]*"5.*,,' \
-
+    
 # Looks like LICENSE file got renamed to COPYING... probably in a newer version of gator
 find . -name 'gator*.bb' | xargs -n1 -i sed -i.orig -e 's,^\(LIC_FILES_CHKSUM[ \t]*=.*driver/\)LICENSE,\1COPYING,g' {} 
-
 
 if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
     # Fix connman boot from NFS issue
