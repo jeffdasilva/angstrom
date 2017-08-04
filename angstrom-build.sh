@@ -168,6 +168,7 @@ fi
 # gator - sept 8
 # libgomp stuff - sept22 - https://community.freescale.com/thread/327612
 # uuid for uefi - aug 22, 2016
+# devmem2 - mar 20, 2017
 
 # opencv stuff added on march 29 -- https://www.pathpartnertech.com/how-to-build-angstrom-linux-distribution-for-altera-soc-fpga-with-open-cv-camera-driver-support/
 
@@ -185,7 +186,7 @@ ncurses-dev ntpdate mosh mosh-server ethtool alsa-lib alsa-utils alsa-tools pyth
 connman connman-client connman-tests connman-tools screen tcpdump usbutils wireless-tools lttng-tools \
 lttng-modules lttng-ust mtd-utils i2c-tools sysfsutils pciutils net-tools \
 opencv opencv-samples opencv-dev opencv-apps opencv-samples-dev \
-oprofile uuid memtool\"" >> sources/meta-altera/conf/machine/socfpga.conf
+oprofile uuid devmem2 memtool\"" >> sources/meta-altera/conf/machine/socfpga.conf
 
 # task-native-sdk
 # task-proper-tools (not replaced)
