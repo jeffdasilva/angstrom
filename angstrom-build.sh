@@ -10,34 +10,48 @@ THIS_SCRIPT=$(basename ${0})
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 ####
-#This is what i do:
-#git clone git://github.com/Angstrom-distribution/setup-scripts.git
-#cd  setup-scripts
-#git checkout -b angstrom-v2014.12-yocto1.7 remotes/origin/angstrom-v2014.12-yocto1.7
-#Mod the sources to add the altera layers, my patch is attached.
-# old way
+# Instructions scripted are found here:
 # see http://rocketboards.org/foswiki/Documentation/AngstromOnSoCFPGA_1
 ####
 
 #ANGSTROM_VER=v2014.12
-ANGSTROM_VER=v2015.12
+#ANGSTROM_VER=v2015.12
+ANGSTROM_VER=v2016.12
+#ANGSTROM_VER=v2017.06
 
+# https://wiki.yoctoproject.org/wiki/Releases
+
+LAYERS_SUBDIR=layers 
 if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
     # does not work with host gcc 5.*
     ANGSTROM_BASE_DIR=setup-scripts
     YOCTO_VER=yocto1.7
-else
-    # work in progress - does not work yet
+    LAYERS_SUBDIR=sources
+elif [ "${ANGSTROM_VER}" = "v2015.12" ]; then
     ANGSTROM_BASE_DIR=angstrom-manifest
     YOCTO_VER=yocto2.0
+    LAYERS_SUBDIR=sources
+    YOCTO_CORE_PROJECT_NAME=jethro
+elif [ "${ANGSTROM_VER}" = "v2016.12" ]; then
+    ANGSTROM_BASE_DIR=angstrom-manifest
+    YOCTO_VER=yocto2.2
+    YOCTO_CORE_PROJECT_NAME=morty
+elif [ "${ANGSTROM_VER}" = "v2017.06" ]; then
+    ANGSTROM_BASE_DIR=angstrom-manifest
+    YOCTO_VER=yocto2.3
+    YOCTO_CORE_PROJECT_NAME=pyro
+else
+    echo "ERROR: unsupported angstrom version"
+    exit 1
 fi
 
-
 #ENABLE_MTDUTILS_PATCH=$[$(date +%j)%2]
+#ENABLE_MTDUTILS_PATCH=1
 ENABLE_MTDUTILS_PATCH=0
 
+ENABLE_KRAJ=1
+
 ANGSTROM_TOP=$(pwd -P)/${ANGSTROM_BASE_DIR}
-#ANGSTROM_MACH=socfpga_cyclone5
 ANGSTROM_MACH=socfpga
 ANGSTROM_MACH_BASELINE=cyclone5
 ANGSTROM_PUBLISH_DIR=${HOME}/doozynas/www/angstrom/${ANGSTROM_VER}
@@ -50,8 +64,8 @@ if [ -f "${ANGSTROM_PUBLISH_DIR}/${THIS_SCRIPT}" ]; then
     diff ${ANGSTROM_PUBLISH_DIR}/${THIS_SCRIPT} ${THIS_DIR}/${THIS_SCRIPT} || true
 fi 
 
-FORCE=${FORCE-1}
-#FORCE=
+#FORCE=${FORCE-1}
+FORCE=${FORCE-0}
 
 echo "Welcome to Angstrom Build"
 date
@@ -70,14 +84,14 @@ if [ "${FORCE}" = "1" ] || [ ! -d ${ANGSTROM_BASE_DIR} ]; then
 	pushd ${ANGSTROM_BASE_DIR}
 	git checkout -b soceds-angstrom-${ANGSTROM_VER}-${YOCTO_VER} remotes/origin/angstrom-${ANGSTROM_VER}-${YOCTO_VER}
     
-	if [ -z "$(grep 'meta-altera' sources/layers.txt 2>/dev/null)" ]; then
-	    echo "meta-altera,https://github.com/altera-opensource/meta-altera.git,angstrom-${ANGSTROM_VER}-${YOCTO_VER},HEAD" >> sources/layers.txt
-	    echo "meta-altera-refdes,https://github.com/altera-opensource/meta-altera-refdes.git,master,HEAD" >> sources/layers.txt
+	if [ -z "$(grep 'meta-altera' ${LAYERS_SUBDIR}/layers.txt 2>/dev/null)" ]; then
+	    echo "meta-altera,https://github.com/altera-opensource/meta-altera.git,angstrom-${ANGSTROM_VER}-${YOCTO_VER},HEAD" >> ${LAYERS_SUBDIR}/layers.txt
+	    echo "meta-altera-refdes,https://github.com/altera-opensource/meta-altera-refdes.git,master,HEAD" >> ${LAYERS_SUBDIR}/layers.txt
 	fi
 
 	if [ -z "$(grep 'meta-altera' conf/bblayers.conf 2>/dev/null)" ]; then
 	    echo >> conf/bblayers.conf
-	    echo 'BASELAYERS += "${TOPDIR}/sources/meta-altera"' >> conf/bblayers.conf
+	    echo 'BASELAYERS += "${TOPDIR}/${LAYERS_SUBDIR}/meta-altera"' >> conf/bblayers.conf
 	    echo >> conf/bblayers.conf
 	fi
    
@@ -93,7 +107,6 @@ if [ "${FORCE}" = "1" ] || [ ! -d ${ANGSTROM_BASE_DIR} ]; then
 	fi
 	popd
     fi
-
 else
     if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
 	echo "GIT PULL"
@@ -106,7 +119,6 @@ fi
 mkdir -p ${ANGSTROM_TOP}
 pushd ${ANGSTROM_TOP}
 
-
 if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
     ##############
     #  1/ Configure the build environment
@@ -114,16 +126,26 @@ if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
     MACHINE=${ANGSTROM_MACH} bash ./oebb.sh config ${ANGSTROM_MACH} || bash ./oebb.sh config ${ANGSTROM_MACH}
     ##############
 else
+
+    if [ ! -d repo ]; then	
+	git clone https://android.googlesource.com/tools/repo
+    fi
+    export PATH=$(pwd)/repo:${PATH}
+    
     repo init -u git://github.com/Angstrom-distribution/angstrom-manifest -b angstrom-${ANGSTROM_VER}-${YOCTO_VER}
-    sed -i.orig -e 's,\(<project[ \t]name="kraj/meta-altera"[ \t].*revision=\).*>,\1"jethro"/>,g' .repo/manifest.xml
+    if [ "${ENABLE_KRAJ}" = "1" ]; then
+	sed -i.orig \
+	    -e 's,\(<project[ \t]name="kraj/meta-altera"[ \t].*revision=\).*>,\1"__YOCTO_CORE_PROJECT_NAME__"/>,g' \
+	    -e "s,__YOCTO_CORE_PROJECT_NAME__,${YOCTO_CORE_PROJECT_NAME},g" \
+	    .repo/manifest.xml
+    fi
     repo sync
     MACHINE=${ANGSTROM_MACH} source setup-environment
 fi
 
-
 # Case:241717
-rm -f sources/meta-altera/conf/machine/socfpga.conf
-cp -v sources/meta-altera/conf/machine/${ANGSTROM_MACH_BASELINE}.conf sources/meta-altera/conf/machine/socfpga.conf
+rm -f ${LAYERS_SUBDIR}/meta-altera/conf/machine/socfpga.conf
+cp -v ${LAYERS_SUBDIR}/meta-altera/conf/machine/${ANGSTROM_MACH_BASELINE}.conf ${LAYERS_SUBDIR}/meta-altera/conf/machine/socfpga.conf
 
 if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
     # JDS added because I read this --> http://en.wikipedia.org/wiki/User:WillWare/Angstrom_and_Beagleboard
@@ -132,20 +154,21 @@ fi
 
 ##############
 #  ...and add a bunch more stuff as well.
-#if [ ! -f "sources/meta-altera/conf/machine/include/socfpga.inc.orig" ]; then
-#    cp sources/meta-altera/conf/machine/include/socfpga.inc sources/meta-altera/conf/machine/include/socfpga.inc.orig
+#if [ ! -f "${LAYERS_SUBDIR}/meta-altera/conf/machine/include/socfpga.inc.orig" ]; then
+#    cp ${LAYERS_SUBDIR}/meta-altera/conf/machine/include/socfpga.inc ${LAYERS_SUBDIR}/meta-altera/conf/machine/include/socfpga.inc.orig
 #fi
 
 ##############
 # Add support for memtool
 if [ -d ~/doozynas/socfpga/memtool/meta-altera/recipes-devtools/memtool ]; then
-    mkdir -p sources/meta-altera/recipes-devtools
-    rm -rf sources/meta-altera/recipes-devtools/memtool
-    cp -rvf ~/doozynas/socfpga/memtool/meta-altera/recipes-devtools/memtool sources/meta-altera/recipes-devtools/
+    HAVE_MEMTOOL=1
+    mkdir -p ${LAYERS_SUBDIR}/meta-altera/recipes-devtools
+    rm -rf ${LAYERS_SUBDIR}/meta-altera/recipes-devtools/memtool
+    cp -rvf ~/doozynas/socfpga/memtool/meta-altera/recipes-devtools/memtool ${LAYERS_SUBDIR}/meta-altera/recipes-devtools/
 fi
 
+
 # http://www.gumstix.org/compile-code-on-my-gumstix.html#angstrom
-#
 #
 # Add Python and Perl to default angstrom image [case:209303, case:210453]
 # new packages
@@ -154,8 +177,8 @@ fi
 # glibc-dev - oct3
 # ncurses-dev - nov5
 # ntpdate - nov5
-# mosh - jan18
-# mosh-server - jan18
+# mosh - jan18 - removed 12/19/2017
+# mosh-server - jan18 - removed 12/19/2017
 # ethtool - feb10
 # alsa-lib alsa-utils alsa-tools - feb11
 # python-modules python-sqlite3 - feb11
@@ -169,64 +192,70 @@ fi
 # libgomp stuff - sept22 - https://community.freescale.com/thread/327612
 # uuid for uefi - aug 22, 2016
 # devmem2 - mar 20, 2017
-
-# opencv stuff added on march 29 -- https://www.pathpartnertech.com/how-to-build-angstrom-linux-distribution-for-altera-soc-fpga-with-open-cv-camera-driver-support/
-
-# tested
-# strongswan - jan18 (just a test) --> works
+# opencv stuff added on mar 29, 2017
+# iperf removed - 12/3/2017
 
 TASK_NATIVE_SDK="gcc-symlinks g++-symlinks cpp cpp-symlinks binutils-symlinks \
 make virtual-libc-dev perl-modules flex flex-dev bison gawk sed grep autoconf \
 automake make patch diffstat diffutils libstdc++-dev libgcc libgcc-dev libstdc++ \
 libstdc++-dev autoconf libgomp libgomp-dev libgomp-staticdev"
 
-echo "IMAGE_INSTALL += \"bash python perl gator ${TASK_NATIVE_SDK} gdbserver glibc-utils glibc-dev gdb binutils \
-gcc g++ make dtc ldd curl rsync initscripts tcf-agent vim nfs-utils nfs-utils-client sudo openssl iperf \
-ncurses-dev ntpdate mosh mosh-server ethtool alsa-lib alsa-utils alsa-tools python-modules python-sqlite3 \
-connman connman-client connman-tests connman-tools screen tcpdump usbutils wireless-tools lttng-tools \
-lttng-modules lttng-ust mtd-utils i2c-tools sysfsutils pciutils net-tools \
-opencv opencv-samples opencv-dev opencv-apps opencv-samples-dev \
-oprofile uuid devmem2 memtool\"" >> sources/meta-altera/conf/machine/socfpga.conf
+PYTHON_PACKAGES="python python-modules python-sqlite3"
 
-# task-native-sdk
-# task-proper-tools (not replaced)
-# patchutils
-# gcc-symlinks g++-symlinks cpp cpp-symlinks binutils-symlinks
-# make virtual-libc-dev
-# task-proper-tools perl-modules flex flex-dev bison gawk sed grep autoconf automake make
-# patch patchutils diffstat diffutils libstdc++-dev
-# libgcc libgcc-dev libstdc++ libstdc++-dev
+BUILD_PACKAGES="${PYTHON_PACKAGES} bash perl gator gdbserver glibc-utils \
+glibc-dev gdb binutils gcc g++ make dtc ldd curl rsync vim"
 
-#https://groups.google.com/forum/#!topic/beagleboard/HV02lnB3P5c
-#
-# packages that cause trouble
-# git
-# netperf - feb11 -- fails because it has a restricted license
-#
-# packages that just don't really work
-# emacs
+#CONNMAN_PACKAGES="connman connman-client connman-tests connman-tools"
 
-# packages that don't exist
-# connman-init-systemd
+# These packages were removed because they fail with a protobuf fetch issue:
+#OPENCV_PACKAGES="opencv opencv-dev opencv-apps"
+
+# This package removed becasue it had a strange warning and
+# may be causing strange behaviour:
+# oprofile
+
+ALSA_PACKAGES="alsa-lib alsa-utils alsa-tools"
+
+LTTNG_PACKAGES="lttng-tools lttng-modules lttng-ust"
+
+EXTRA_PACKAGES="${TASK_NATIVE_SDK} ${BUILD_PACKAGES} initscripts tcf-agent \
+nfs-utils nfs-utils-client sudo openssl ncurses-dev ntpdate ethtool \
+screen tcpdump usbutils wireless-tools ${ALSA_PACKAGES} ${LTTNG_PACKAGES} \
+mtd-utils i2c-tools sysfsutils pciutils net-tools"
+
+EXTRA_PACKAGES="${EXTRA_PACKAGES} uuid devmem2"
+
+if [ "${HAVE_MEMTOOL}" == "1" ]; then
+    EXTRA_PACKAGES="${EXTRA_PACKAGES} memtool"
+fi
+
+ADD_EXTRA_PACKAGES=1
+
+if [ "${ADD_EXTRA_PACKAGES}" == "1" ]; then
+    echo "IMAGE_INSTALL += \"${EXTRA_PACKAGES}\""  >> ${LAYERS_SUBDIR}/meta-altera/conf/machine/socfpga.conf
+fi
 
 # https://wiki.yoctoproject.org/wiki/Tracing_and_Profiling
 # Don't strip symbols
-#echo 'INHIBIT_PACKAGE_STRIP = "1"' >> sources/meta-altera/conf/machine/include/socfpga.inc
+#echo 'INHIBIT_PACKAGE_STRIP = "1"' >> ${LAYERS_SUBDIR}/meta-altera/conf/machine/include/socfpga.inc
 
 # Add debug features
-#echo 'EXTRA_IMAGE_FEATURES = "debug-tweaks dbg-pkgs"' >> sources/meta-altera/conf/machine/include/socfpga.inc
+#echo 'EXTRA_IMAGE_FEATURES = "debug-tweaks dbg-pkgs"' >> ${LAYERS_SUBDIR}/meta-altera/conf/machine/include/socfpga.inc
 
 # Aug 22, 2016 to fix sshd issue
 # Sept 13, 2016 allow-empty-password added
-echo 'EXTRA_IMAGE_FEATURES = "allow-empty-password debug-tweaks"' >> sources/meta-altera/conf/machine/include/socfpga.inc
+echo 'EXTRA_IMAGE_FEATURES = "allow-empty-password debug-tweaks"' >> ${LAYERS_SUBDIR}/meta-altera/conf/machine/include/socfpga.inc
 
 
 ##############
 
 if [ "${FIX_GATOR_GIT_TAG}" == "1" ]; then
 
+    echo "ERROR: FIX_GATOR_GIT_TAG feature probably no longer works"
+    exit 1
+
     # Fix Gator init.d [case:208846]
-    # sed -i -e 's,\(^[.][ \t]*/etc/init.d/functions.*\),if [ -f /etc/init.d/functions ]; then \1; fi,g' sources/meta-linaro/meta-linaro/recipes-kernel/gator/gator/gator.init
+    # sed -i -e 's,\(^[.][ \t]*/etc/init.d/functions.*\),if [ -f /etc/init.d/functions ]; then \1; fi,g' ${LAYERS_SUBDIR}/meta-linaro/meta-linaro/recipes-kernel/gator/gator/gator.init
 
     GATOR_GIT_TAG="$(wget -q -O - "https://git.linaro.org/?p=arm/ds5/gator.git" | grep '/arm/ds5/gator.git/commit/' | head -n1 | sed -e 's,.*/arm/ds5/gator.git/commit/\([0-9a-zA-Z]*\).*,\1,g' 2>/dev/null)"
     
@@ -241,7 +270,7 @@ if [ "${FIX_GATOR_GIT_TAG}" == "1" ]; then
     #    exit 1
     #fi
 
-    #sed -i -e "s,^SRCREV=.*,SRCREV=\"${GATOR_GIT_TAG}\"," sources/meta-altera/recipes-devtools/gator/gator_1.0.bb
+    #sed -i -e "s,^SRCREV=.*,SRCREV=\"${GATOR_GIT_TAG}\"," ${LAYERS_SUBDIR}/meta-altera/recipes-devtools/gator/gator_1.0.bb
 
     echo Gator Git Tag is: ${GATOR_GIT_TAG}
     if [ -z "${GATOR_GIT_TAG}" ]; then
@@ -249,15 +278,15 @@ if [ "${FIX_GATOR_GIT_TAG}" == "1" ]; then
 	exit 1
     fi
 
-    if [ -f "sources/meta-linaro/meta-linaro/recipes-kernel/gator/gator_git.bb" ]; then
-	sed -i -e "s,^SRCREV[ \t]*=.*,SRCREV = \"${GATOR_GIT_TAG}\"," sources/meta-linaro/meta-linaro/recipes-kernel/gator/gator_git.bb
+    if [ -f "${LAYERS_SUBDIR}/meta-linaro/meta-linaro/recipes-kernel/gator/gator_git.bb" ]; then
+	sed -i -e "s,^SRCREV[ \t]*=.*,SRCREV = \"${GATOR_GIT_TAG}\"," ${LAYERS_SUBDIR}/meta-linaro/meta-linaro/recipes-kernel/gator/gator_git.bb
     fi
 
-    if [ -f "sources/meta-altera/recipes-devtools/gator/gator_1.0.bb" ]; then
+    if [ -f "${LAYERS_SUBDIR}/meta-altera/recipes-devtools/gator/gator_1.0.bb" ]; then
 	sed -i \
 	    -e 's,^SRCREV[ \t]*=.*,SRCREV = "${AUTOREV}",' \
 	    -e 's,git://git.linaro.org/git-ro/arm/ds5/gator.git;protocol=http,https://github.com/ARM-software/gator.git;protocol=https,g' \
-	    sources/meta-altera/recipes-devtools/gator/gator_1.0.bb
+	    ${LAYERS_SUBDIR}/meta-altera/recipes-devtools/gator/gator_1.0.bb
     fi
 fi
     
@@ -267,15 +296,15 @@ find . -name 'gator*.bb' | xargs -n1 -i sed -i.orig -e 's,^\(LIC_FILES_CHKSUM[ \
 if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
     # Fix connman boot from NFS issue
     # http://www.ptrackapp.com/apclassys-notes/embedded-linux-using-connma/
-    # http://developer.toradex.com/software-resources/arm-family/linux/linux-booting
+    # http://developer.toradex.com/software-re${LAYERS_SUBDIR}/arm-family/linux/linux-booting
     #  fix it as documented in http://rocketboards.org/foswiki/Documentation/AngstromOnSoCFPGA_1 [case:209754]
-    sed -i -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(ExecStart=/usr/sbin/connmand -n\\)\\\$#\\1 -I eth0#" \${S}/src/connman.service,' sources/openembedded-core/meta/recipes-connectivity/connman/connman.inc
+    sed -i -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(ExecStart=/usr/sbin/connmand -n\\)\\\$#\\1 -I eth0#" \${S}/src/connman.service,' ${LAYERS_SUBDIR}/openembedded-core/meta/recipes-connectivity/connman/connman.inc
 else
-    #    sed -i.orig -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(ExecStart=.*/connmand -n\\)\\\$#\\1 -I eth0#" \${S}/src/connman.service.in,' sources/openembedded-core/meta/recipes-connectivity/connman/connman.inc
-    #sed -i.orig -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(ExecStart=.*/connmand -n\\)\\\$#\\1 -I eth0#" \${B}/src/connman.service,' sources/openembedded-core/meta/recipes-connectivity/connman/connman.inc
+    #    sed -i.orig -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(ExecStart=.*/connmand -n\\)\\\$#\\1 -I eth0#" \${S}/src/connman.service.in,' ${LAYERS_SUBDIR}/openembedded-core/meta/recipes-connectivity/connman/connman.inc
+    #sed -i.orig -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(ExecStart=.*/connmand -n\\)\\\$#\\1 -I eth0#" \${B}/src/connman.service,' ${LAYERS_SUBDIR}/openembedded-core/meta/recipes-connectivity/connman/connman.inc
 
     # as documented in [case:404248]
-    sed -i.orig -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(Wants=network.target.*\\)\\\$#\\1\\nConditionKernelCommandLine=!root=/dev/nfs#" \${B}/src/connman.service,' sources/openembedded-core/meta/recipes-connectivity/connman/connman.inc
+    sed -i.orig -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(Wants=network.target.*\\)\\\$#\\1\\nConditionKernelCommandLine=!root=/dev/nfs#" \${B}/src/connman.service,' ${LAYERS_SUBDIR}/openembedded-core/meta/recipes-connectivity/connman/connman.inc
 
 fi
 
@@ -290,9 +319,9 @@ fi
 # connman connman-client - Nov 6th
 # aug 16 swich from core-imaga-small.bb to core image-minimal-mtdutils.bb
 
-mkdir -p sources/meta-altera/recipes-images/angstrom
-cp -v ../core-image-small.bb sources/openembedded-core/meta/recipes-core/images
-cat > sources/meta-altera/recipes-images/angstrom/soceds-initramfs.bb <<EOF
+mkdir -p ${LAYERS_SUBDIR}/meta-altera/recipes-images/angstrom
+cp -v ../core-image-small.bb ${LAYERS_SUBDIR}/openembedded-core/meta/recipes-core/images
+cat > ${LAYERS_SUBDIR}/meta-altera/recipes-images/angstrom/soceds-initramfs.bb <<EOF
 require recipes-core/images/core-image-minimal-mtdutils.bb
 
 DESCRIPTION = "Small image suitable for initramfs boot."
@@ -325,7 +354,7 @@ fi
 #MACHINE=${ANGSTROM_MACH} bitbake virtual/kernel
 
 if [ "${ENABLE_MTDUTILS_PATCH}" = "1" ]; then
-    pushd sources/meta-altera
+    pushd ${LAYERS_SUBDIR}/meta-altera
     git apply ../../../fb_381598_mtd_utils.patch
     popd
 fi
@@ -371,11 +400,11 @@ ANGSTROM_IMAGE_DIR=deploy/glibc/images/${ANGSTROM_MACH}
 cp -fv deploy/glibc/licenses/${ANGSTROM_MACH}/${IMG}-*/license.manifest angstrom-rootfs-license.manifest
 cp -vf deploy/glibc/images/${ANGSTROM_MACH}/${IMG}-*.rootfs.tar.xz angstrom-rootfs.tar.xz
 7z x angstrom-rootfs.tar.xz
-tar --delete -f angstrom-rootfs.tar ./lib/modules || true
+tar --delete -f angstrom-rootfs.tar ./lib/modules 2>/dev/null || true
 
 # this prevents opkg update from working see http://rocketboards.org/foswiki/Documentation/AngstromOnSoCFPGA_1
 # there is another fb case on this
-tar --delete -f angstrom-rootfs.tar ./etc/opkg/socfpga-feed.conf || true
+tar --delete -f angstrom-rootfs.tar ./etc/opkg/socfpga-feed.conf 2>/dev/null || true
 
 # add lib/firmware dir
 mkdir -p lib/firmware
@@ -395,8 +424,8 @@ cp -vf angstrom-rootfs-license.manifest ${ANGSTROM_PUBLISH_DIR}/angstrom-rootfs-
 IMG_MINIMAL=Angstrom-soceds-initramfs
 cp -vf ${ANGSTROM_IMAGE_DIR}/${IMG_MINIMAL}-*.rootfs.tar.xz angstrom-minimal-rootfs.tar.xz
 7z x angstrom-minimal-rootfs.tar.xz
-tar --delete -f angstrom-minimal-rootfs.tar ./lib/modules || true
-tar --delete -f angstrom-minimal-rootfs.tar ./etc/opkg/socfpga-feed.conf || true
+tar --delete -f angstrom-minimal-rootfs.tar ./lib/modules 2>/dev/null || true
+tar --delete -f angstrom-minimal-rootfs.tar ./etc/opkg/socfpga-feed.conf 2>/dev/null || true
 
 mkdir -p lib/firmware
 tar --append -f angstrom-minimal-rootfs.tar lib/firmware
