@@ -51,10 +51,23 @@ ENABLE_MTDUTILS_PATCH=0
 
 ENABLE_KRAJ=1
 
+ENABLE_S10=${ENABLE_S10-1}
+#ENABLE_S10=${ENABLE_S10-0}
+
+FORCE=${FORCE-1}
+#FORCE=${FORCE-0}
+
 ANGSTROM_TOP=$(pwd -P)/${ANGSTROM_BASE_DIR}
-ANGSTROM_MACH=socfpga
-ANGSTROM_MACH_BASELINE=cyclone5
 ANGSTROM_PUBLISH_DIR=${HOME}/doozynas/www/angstrom/${ANGSTROM_VER}
+
+if [ "${ENABLE_S10}" == "1" ]; then
+    ANGSTROM_MACH=stratix10swvp
+    ANGSTROM_MACH_BASELINE=stratix10swvp
+    ANGSTROM_PUBLISH_DIR=${ANGSTROM_PUBLISH_DIR}/s10
+else
+    ANGSTROM_MACH=socfpga
+    ANGSTROM_MACH_BASELINE=cyclone5
+fi
 
 if [ "${ENABLE_MTDUTILS_PATCH}" = "1" ]; then
     ANGSTROM_PUBLISH_DIR=${ANGSTROM_PUBLISH_DIR}.patched
@@ -63,9 +76,6 @@ fi
 if [ -f "${ANGSTROM_PUBLISH_DIR}/${THIS_SCRIPT}" ]; then
     diff ${ANGSTROM_PUBLISH_DIR}/${THIS_SCRIPT} ${THIS_DIR}/${THIS_SCRIPT} || true
 fi 
-
-#FORCE=${FORCE-1}
-FORCE=${FORCE-0}
 
 echo "Welcome to Angstrom Build"
 date
@@ -143,9 +153,11 @@ else
     MACHINE=${ANGSTROM_MACH} source setup-environment
 fi
 
-# Case:241717
-rm -f ${LAYERS_SUBDIR}/meta-altera/conf/machine/socfpga.conf
-cp -v ${LAYERS_SUBDIR}/meta-altera/conf/machine/${ANGSTROM_MACH_BASELINE}.conf ${LAYERS_SUBDIR}/meta-altera/conf/machine/socfpga.conf
+if [ "${ANGSTROM_MACH}" != "${ANGSTROM_MACH_BASELINE}" ]; then
+    # Case:241717
+    rm -f ${LAYERS_SUBDIR}/meta-altera/conf/machine/${ANGSTROM_MACH}.conf
+    cp -v ${LAYERS_SUBDIR}/meta-altera/conf/machine/${ANGSTROM_MACH_BASELINE}.conf ${LAYERS_SUBDIR}/meta-altera/conf/machine/${ANGSTROM_MACH}.conf
+fi
 
 if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
     # JDS added because I read this --> http://en.wikipedia.org/wiki/User:WillWare/Angstrom_and_Beagleboard
@@ -166,7 +178,6 @@ if [ -d ~/doozynas/socfpga/memtool/meta-altera/recipes-devtools/memtool ]; then
     rm -rf ${LAYERS_SUBDIR}/meta-altera/recipes-devtools/memtool
     cp -rvf ~/doozynas/socfpga/memtool/meta-altera/recipes-devtools/memtool ${LAYERS_SUBDIR}/meta-altera/recipes-devtools/
 fi
-
 
 # http://www.gumstix.org/compile-code-on-my-gumstix.html#angstrom
 #
@@ -232,7 +243,7 @@ fi
 ADD_EXTRA_PACKAGES=1
 
 if [ "${ADD_EXTRA_PACKAGES}" == "1" ]; then
-    echo "IMAGE_INSTALL += \"${EXTRA_PACKAGES}\""  >> ${LAYERS_SUBDIR}/meta-altera/conf/machine/socfpga.conf
+    echo "IMAGE_INSTALL += \"${EXTRA_PACKAGES}\""  >> ${LAYERS_SUBDIR}/meta-altera/conf/machine/${ANGSTROM_MACH}.conf
 fi
 
 # https://wiki.yoctoproject.org/wiki/Tracing_and_Profiling
@@ -244,54 +255,14 @@ fi
 
 # Aug 22, 2016 to fix sshd issue
 # Sept 13, 2016 allow-empty-password added
-echo 'EXTRA_IMAGE_FEATURES = "allow-empty-password debug-tweaks"' >> ${LAYERS_SUBDIR}/meta-altera/conf/machine/include/socfpga.inc
 
+if [ "${ENABLE_S10}" = "1" ]; then
+    echo 'EXTRA_IMAGE_FEATURES = "allow-empty-password debug-tweaks"' >> ${LAYERS_SUBDIR}/meta-altera/conf/machine/${ANGSTROM_MACH}.conf
+else
+    echo 'EXTRA_IMAGE_FEATURES = "allow-empty-password debug-tweaks"' >> ${LAYERS_SUBDIR}/meta-altera/conf/machine/include/socfpga.inc
+fi
 
 ##############
-
-if [ "${FIX_GATOR_GIT_TAG}" == "1" ]; then
-
-    echo "ERROR: FIX_GATOR_GIT_TAG feature probably no longer works"
-    exit 1
-
-    # Fix Gator init.d [case:208846]
-    # sed -i -e 's,\(^[.][ \t]*/etc/init.d/functions.*\),if [ -f /etc/init.d/functions ]; then \1; fi,g' ${LAYERS_SUBDIR}/meta-linaro/meta-linaro/recipes-kernel/gator/gator/gator.init
-
-    GATOR_GIT_TAG="$(wget -q -O - "https://git.linaro.org/?p=arm/ds5/gator.git" | grep '/arm/ds5/gator.git/commit/' | head -n1 | sed -e 's,.*/arm/ds5/gator.git/commit/\([0-9a-zA-Z]*\).*,\1,g' 2>/dev/null)"
-    
-    #Old Gator Git tag for 5.19 I think...
-    #GATOR_GIT_TAG="ba783f1443773505231ac2808c9a3716c3c2f3ae"
-    #5.19.1
-    #GATOR_GIT_TAG="5e3cabe778188543611a71a59094292fb34c49df"
-    
-    #echo "GATOR_GIT_TAG is ${GATOR_GIT_TAG}"
-    #if [ -z "${GATOR_GIT_TAG}" ]; then
-    #    echo "ERROR: GATOR_GIT_TAG not discovered"
-    #    exit 1
-    #fi
-
-    #sed -i -e "s,^SRCREV=.*,SRCREV=\"${GATOR_GIT_TAG}\"," ${LAYERS_SUBDIR}/meta-altera/recipes-devtools/gator/gator_1.0.bb
-
-    echo Gator Git Tag is: ${GATOR_GIT_TAG}
-    if [ -z "${GATOR_GIT_TAG}" ]; then
-	echo "ERROR: Gator Git tag is invalid"
-	exit 1
-    fi
-
-    if [ -f "${LAYERS_SUBDIR}/meta-linaro/meta-linaro/recipes-kernel/gator/gator_git.bb" ]; then
-	sed -i -e "s,^SRCREV[ \t]*=.*,SRCREV = \"${GATOR_GIT_TAG}\"," ${LAYERS_SUBDIR}/meta-linaro/meta-linaro/recipes-kernel/gator/gator_git.bb
-    fi
-
-    if [ -f "${LAYERS_SUBDIR}/meta-altera/recipes-devtools/gator/gator_1.0.bb" ]; then
-	sed -i \
-	    -e 's,^SRCREV[ \t]*=.*,SRCREV = "${AUTOREV}",' \
-	    -e 's,git://git.linaro.org/git-ro/arm/ds5/gator.git;protocol=http,https://github.com/ARM-software/gator.git;protocol=https,g' \
-	    ${LAYERS_SUBDIR}/meta-altera/recipes-devtools/gator/gator_1.0.bb
-    fi
-fi
-    
-# Looks like LICENSE file got renamed to COPYING... probably in a newer version of gator
-find . -name 'gator*.bb' | xargs -n1 -i sed -i.orig -e 's,^\(LIC_FILES_CHKSUM[ \t]*=.*driver/\)LICENSE,\1COPYING,g' {} 
 
 if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
     # Fix connman boot from NFS issue
@@ -358,6 +329,10 @@ if [ "${ENABLE_MTDUTILS_PATCH}" = "1" ]; then
     git apply ../../../fb_381598_mtd_utils.patch
     popd
 fi
+
+export KBRANCH=socfpga-4.1.33-ltsi
+#export KBRANCH=socfpga-4.9.51-ltsi
+export KERNEL_PROVIDER=linux-altera-ltsi
 
 MACHINE=${ANGSTROM_MACH} bitbake console-image
 
