@@ -49,7 +49,8 @@ echo "Angstrom Build Start: $(date)" > ~/angstrom_build.log
 echo "About to run \"${ANGSTROM_SH}\""
 sleep 5
 
-${ANGSTROM_SH} 2>&1
+FORCE=1 ENABLE_S10=0 ${ANGSTROM_SH} 2>&1
+FORCE=0 ENABLE_S10=1 ${ANGSTROM_SH} 2>&1
 
 date
 echo "Angstrom Build End: $(date)" >> ~/angstrom_build.log
