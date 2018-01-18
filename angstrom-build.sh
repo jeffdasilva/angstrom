@@ -171,6 +171,15 @@ fi
 #fi
 
 ##############
+APPLY_CONNMAN_PATCH=1
+if [ "${APPLY_CONNMAN_PATCH}" = "1" ]; then
+    # see https://gerrit.automotivelinux.org/gerrit/#/c/5545/
+    mkdir -p ${LAYERS_SUBDIR}/meta-altera/recipes-connectivity
+    rm -rf ${LAYERS_SUBDIR}/meta-altera/recipes-connectivity/connman
+    cp -rvf ${THIS_DIR}/connman/meta-altera/recipes-connectivity/connman ${LAYERS_SUBDIR}/meta-altera/recipes-connectivity/
+fi
+
+##############
 # Add support for memtool
 if [ -d ~/doozynas/socfpga/memtool/meta-altera/recipes-devtools/memtool ]; then
     HAVE_MEMTOOL=1
@@ -216,7 +225,7 @@ PYTHON_PACKAGES="python python-modules python-sqlite3"
 BUILD_PACKAGES="${PYTHON_PACKAGES} bash perl gator gdbserver glibc-utils \
 glibc-dev gdb binutils gcc g++ make dtc ldd curl rsync vim"
 
-#CONNMAN_PACKAGES="connman connman-client connman-tests connman-tools"
+CONNMAN_PACKAGES="connman connman-client connman-tests connman-tools"
 
 # These packages were removed because they fail with a protobuf fetch issue:
 #OPENCV_PACKAGES="opencv opencv-dev opencv-apps"
@@ -229,9 +238,10 @@ ALSA_PACKAGES="alsa-lib alsa-utils alsa-tools"
 
 LTTNG_PACKAGES="lttng-tools lttng-modules lttng-ust"
 
-EXTRA_PACKAGES="${TASK_NATIVE_SDK} ${BUILD_PACKAGES} initscripts tcf-agent \
-nfs-utils nfs-utils-client sudo openssl ncurses-dev ntpdate ethtool \
-screen tcpdump usbutils wireless-tools ${ALSA_PACKAGES} ${LTTNG_PACKAGES} \
+EXTRA_PACKAGES="${TASK_NATIVE_SDK} ${BUILD_PACKAGES} ${CONNMAN_PACKAGES} \
+initscripts tcf-agent nfs-utils nfs-utils-client sudo openssl ncurses-dev \
+ntpdate ethtool screen tcpdump usbutils wireless-tools \
+${ALSA_PACKAGES} ${LTTNG_PACKAGES} \
 mtd-utils i2c-tools sysfsutils pciutils net-tools"
 
 EXTRA_PACKAGES="${EXTRA_PACKAGES} uuid devmem2"
@@ -270,13 +280,9 @@ if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
     # http://developer.toradex.com/software-re${LAYERS_SUBDIR}/arm-family/linux/linux-booting
     #  fix it as documented in http://rocketboards.org/foswiki/Documentation/AngstromOnSoCFPGA_1 [case:209754]
     sed -i -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(ExecStart=/usr/sbin/connmand -n\\)\\\$#\\1 -I eth0#" \${S}/src/connman.service,' ${LAYERS_SUBDIR}/openembedded-core/meta/recipes-connectivity/connman/connman.inc
-else
-    #    sed -i.orig -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(ExecStart=.*/connmand -n\\)\\\$#\\1 -I eth0#" \${S}/src/connman.service.in,' ${LAYERS_SUBDIR}/openembedded-core/meta/recipes-connectivity/connman/connman.inc
-    #sed -i.orig -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(ExecStart=.*/connmand -n\\)\\\$#\\1 -I eth0#" \${B}/src/connman.service,' ${LAYERS_SUBDIR}/openembedded-core/meta/recipes-connectivity/connman/connman.inc
-
+elif [ "${ANGSTROM_VER}" = "v2015.12" ]; then
     # as documented in [case:404248]
     sed -i.orig -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(Wants=network.target.*\\)\\\$#\\1\\nConditionKernelCommandLine=!root=/dev/nfs#" \${B}/src/connman.service,' ${LAYERS_SUBDIR}/openembedded-core/meta/recipes-connectivity/connman/connman.inc
-
 fi
 
 # qspi boot on rocketboards says to add this
@@ -330,8 +336,11 @@ if [ "${ENABLE_MTDUTILS_PATCH}" = "1" ]; then
     popd
 fi
 
-export KBRANCH=socfpga-4.1.33-ltsi
-#export KBRANCH=socfpga-4.9.51-ltsi
+if [ "${ANGSTROM_VER}" = "v2014.12" ] || [ "${ANGSTROM_VER}" = "v2015.12" ]; then
+    export KBRANCH=socfpga-4.1.33-ltsi
+else
+    export KBRANCH=socfpga-4.9.51-ltsi
+fi
 export KERNEL_PROVIDER=linux-altera-ltsi
 
 MACHINE=${ANGSTROM_MACH} bitbake console-image

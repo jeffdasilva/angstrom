@@ -1,0 +1,11 @@
+diff -urN a/src/connman.service.in b/src/connman.service.in
+--- a/src/connman.service.in	2018-01-16 19:30:29.685583210 -0800
++++ b/src/connman.service.in	2018-01-16 23:31:09.253611716 -0800
+@@ -6,6 +6,7 @@
+ After=dbus.service network-pre.target systemd-sysusers.service
+ Before=network.target multi-user.target shutdown.target
+ Wants=network.target
++ConditionKernelCommandLine=!root=/dev/nfs
+ 
+ [Service]
+ Type=dbus
