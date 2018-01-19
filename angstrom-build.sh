@@ -16,8 +16,8 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 #ANGSTROM_VER=v2014.12
 #ANGSTROM_VER=v2015.12
-ANGSTROM_VER=v2016.12
-#ANGSTROM_VER=v2017.06
+#ANGSTROM_VER=v2016.12
+ANGSTROM_VER=v2017.06
 
 # https://wiki.yoctoproject.org/wiki/Releases
 
@@ -234,7 +234,8 @@ CONNMAN_PACKAGES="connman connman-client connman-tests connman-tools"
 # may be causing strange behaviour:
 # oprofile
 
-ALSA_PACKAGES="alsa-lib alsa-utils alsa-tools"
+#removing alsa because 2017.06 doesn't seem to have alsa-lib package
+#ALSA_PACKAGES="alsa-lib alsa-utils alsa-tools"
 
 LTTNG_PACKAGES="lttng-tools lttng-modules lttng-ust"
 
