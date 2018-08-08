@@ -17,7 +17,9 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 #ANGSTROM_VER=v2014.12
 #ANGSTROM_VER=v2015.12
 #ANGSTROM_VER=v2016.12
-ANGSTROM_VER=v2017.06
+#ANGSTROM_VER=v2017.06
+ANGSTROM_VER=v2017.12
+#ANGSTROM_VER=v2018.06
 
 # https://wiki.yoctoproject.org/wiki/Releases
 
@@ -27,19 +29,31 @@ if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
     ANGSTROM_BASE_DIR=setup-scripts
     YOCTO_VER=yocto1.7
     LAYERS_SUBDIR=sources
+    echo "DEPRECATED"; exit 1
 elif [ "${ANGSTROM_VER}" = "v2015.12" ]; then
     ANGSTROM_BASE_DIR=angstrom-manifest
     YOCTO_VER=yocto2.0
     LAYERS_SUBDIR=sources
     YOCTO_CORE_PROJECT_NAME=jethro
+    echo "DEPRECATED"; exit 1
 elif [ "${ANGSTROM_VER}" = "v2016.12" ]; then
     ANGSTROM_BASE_DIR=angstrom-manifest
     YOCTO_VER=yocto2.2
     YOCTO_CORE_PROJECT_NAME=morty
+    echo "DEPRECATED"; exit 1
 elif [ "${ANGSTROM_VER}" = "v2017.06" ]; then
     ANGSTROM_BASE_DIR=angstrom-manifest
     YOCTO_VER=yocto2.3
     YOCTO_CORE_PROJECT_NAME=pyro
+    echo "DEPRECATED"; exit 1
+elif [ "${ANGSTROM_VER}" = "v2017.12" ]; then
+    ANGSTROM_BASE_DIR=angstrom-manifest
+    YOCTO_VER=yocto2.4
+    YOCTO_CORE_PROJECT_NAME=rocko
+elif [ "${ANGSTROM_VER}" = "v2018.06" ]; then
+    ANGSTROM_BASE_DIR=angstrom-manifest
+    YOCTO_VER=yocto2.5
+    YOCTO_CORE_PROJECT_NAME=sumo
 else
     echo "ERROR: unsupported angstrom version"
     exit 1
@@ -60,9 +74,10 @@ FORCE=${FORCE-0}
 ANGSTROM_TOP=$(pwd -P)/${ANGSTROM_BASE_DIR}
 ANGSTROM_PUBLISH_DIR=${HOME}/doozynas/www/angstrom/${ANGSTROM_VER}
 
+
 if [ "${ENABLE_S10}" == "1" ]; then
-    ANGSTROM_MACH=stratix10swvp
-    ANGSTROM_MACH_BASELINE=stratix10swvp
+    ANGSTROM_MACH=stratix10
+    ANGSTROM_MACH_BASELINE=stratix10
     ANGSTROM_PUBLISH_DIR=${ANGSTROM_PUBLISH_DIR}/s10
 else
     ANGSTROM_MACH=socfpga
@@ -88,70 +103,28 @@ if [ "${FORCE}" = "1" ] || [ ! -d ${ANGSTROM_BASE_DIR} ]; then
 	mv ${ANGSTROM_BASE_DIR} ${ANGSTROM_BASE_DIR}.delete || true
 	rm -rf ${ANGSTROM_BASE_DIR}.delete &
     fi
-
-    if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
-	git clone git://github.com/Angstrom-distribution/${ANGSTROM_BASE_DIR}.git
-	pushd ${ANGSTROM_BASE_DIR}
-	git checkout -b soceds-angstrom-${ANGSTROM_VER}-${YOCTO_VER} remotes/origin/angstrom-${ANGSTROM_VER}-${YOCTO_VER}
-    
-	if [ -z "$(grep 'meta-altera' ${LAYERS_SUBDIR}/layers.txt 2>/dev/null)" ]; then
-	    echo "meta-altera,https://github.com/altera-opensource/meta-altera.git,angstrom-${ANGSTROM_VER}-${YOCTO_VER},HEAD" >> ${LAYERS_SUBDIR}/layers.txt
-	    echo "meta-altera-refdes,https://github.com/altera-opensource/meta-altera-refdes.git,master,HEAD" >> ${LAYERS_SUBDIR}/layers.txt
-	fi
-
-	if [ -z "$(grep 'meta-altera' conf/bblayers.conf 2>/dev/null)" ]; then
-	    echo >> conf/bblayers.conf
-	    echo 'BASELAYERS += "${TOPDIR}/${LAYERS_SUBDIR}/meta-altera"' >> conf/bblayers.conf
-	    echo >> conf/bblayers.conf
-	fi
-   
-
-	# create this patch with
-	#   cd ${ANGSTROM_BASE_DIR}
-	#   git diff > ../altera-mods-patch.diff
-	#   subract stuff altera echo stuff from above
-	PATCH_FILE=../altera-mods-patch.diff
-	if [ -f "${PATCH_FILE}" ]; then
-	    echo "Apply Patch ${PATCH_FILE}"
-	    git apply ${PATCH_FILE}
-	fi
-	popd
-    fi
-else
-    if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
-	echo "GIT PULL"
-	pushd ${ANGSTROM_TOP}
-	git pull
-	popd
-    fi
 fi
 
 mkdir -p ${ANGSTROM_TOP}
 pushd ${ANGSTROM_TOP}
 
-if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
-    ##############
-    #  1/ Configure the build environment
-    # run twice because of /bin/bash /bin/dash symlink issues
-    MACHINE=${ANGSTROM_MACH} bash ./oebb.sh config ${ANGSTROM_MACH} || bash ./oebb.sh config ${ANGSTROM_MACH}
-    ##############
-else
 
-    if [ ! -d repo ]; then	
-	git clone https://android.googlesource.com/tools/repo
-    fi
-    export PATH=$(pwd)/repo:${PATH}
-    
-    repo init -u git://github.com/Angstrom-distribution/angstrom-manifest -b angstrom-${ANGSTROM_VER}-${YOCTO_VER}
-    if [ "${ENABLE_KRAJ}" = "1" ]; then
-	sed -i.orig \
-	    -e 's,\(<project[ \t]name="kraj/meta-altera"[ \t].*revision=\).*>,\1"__YOCTO_CORE_PROJECT_NAME__"/>,g' \
-	    -e "s,__YOCTO_CORE_PROJECT_NAME__,${YOCTO_CORE_PROJECT_NAME},g" \
-	    .repo/manifest.xml
-    fi
-    repo sync
-    MACHINE=${ANGSTROM_MACH} source setup-environment
+if [ ! -d repo ]; then	
+    git clone https://android.googlesource.com/tools/repo
 fi
+export PATH=$(pwd)/repo:${PATH}
+
+repo init -u git://github.com/Angstrom-distribution/angstrom-manifest -b angstrom-${ANGSTROM_VER}-${YOCTO_CORE_PROJECT_NAME}
+
+if [ "${ENABLE_KRAJ}" = "1" ]; then
+    sed -i.orig \
+	-e 's,\(<project[ \t]name="kraj/meta-altera"[ \t].*revision=\).*>,\1"__YOCTO_CORE_PROJECT_NAME__"/>,g' \
+	-e "s,__YOCTO_CORE_PROJECT_NAME__,${YOCTO_CORE_PROJECT_NAME},g" \
+	.repo/manifest.xml
+fi
+repo sync
+MACHINE=${ANGSTROM_MACH} source setup-environment
+
 
 if [ "${ANGSTROM_MACH}" != "${ANGSTROM_MACH_BASELINE}" ]; then
     # Case:241717
@@ -171,7 +144,7 @@ fi
 #fi
 
 ##############
-APPLY_CONNMAN_PATCH=1
+#APPLY_CONNMAN_PATCH=1
 if [ "${APPLY_CONNMAN_PATCH}" = "1" ]; then
     # see https://gerrit.automotivelinux.org/gerrit/#/c/5545/
     mkdir -p ${LAYERS_SUBDIR}/meta-altera/recipes-connectivity
@@ -181,39 +154,12 @@ fi
 
 ##############
 # Add support for memtool
-if [ -d ~/doozynas/socfpga/memtool/meta-altera/recipes-devtools/memtool ]; then
-    HAVE_MEMTOOL=1
-    mkdir -p ${LAYERS_SUBDIR}/meta-altera/recipes-devtools
-    rm -rf ${LAYERS_SUBDIR}/meta-altera/recipes-devtools/memtool
-    cp -rvf ~/doozynas/socfpga/memtool/meta-altera/recipes-devtools/memtool ${LAYERS_SUBDIR}/meta-altera/recipes-devtools/
-fi
-
-# http://www.gumstix.org/compile-code-on-my-gumstix.html#angstrom
-#
-# Add Python and Perl to default angstrom image [case:209303, case:210453]
-# new packages
-# task-native-sdk - oct 3 -- doesn't work anymore
-# glibc-utils - oct3
-# glibc-dev - oct3
-# ncurses-dev - nov5
-# ntpdate - nov5
-# mosh - jan18 - removed 12/19/2017
-# mosh-server - jan18 - removed 12/19/2017
-# ethtool - feb10
-# alsa-lib alsa-utils alsa-tools - feb11
-# python-modules python-sqlite3 - feb11
-# connman connman-client connman-tests connman-tools - feb 12
-# screen tcpdump usbutils wireless-tools - feb12
-# lttng-tools lttng-modules lttng-ust - Mar2
-# memtool - mar17
-# mtd-utils - april11
-# i2c-tools - may 11
-# gator - sept 8
-# libgomp stuff - sept22 - https://community.freescale.com/thread/327612
-# uuid for uefi - aug 22, 2016
-# devmem2 - mar 20, 2017
-# opencv stuff added on mar 29, 2017
-# iperf removed - 12/3/2017
+#if [ -d ~/doozynas/socfpga/memtool/meta-altera/recipes-devtools/memtool ]; then
+#    HAVE_MEMTOOL=1
+#    mkdir -p ${LAYERS_SUBDIR}/meta-altera/recipes-devtools
+#    rm -rf ${LAYERS_SUBDIR}/meta-altera/recipes-devtools/memtool
+#    cp -rvf ~/doozynas/socfpga/memtool/meta-altera/recipes-devtools/memtool ${LAYERS_SUBDIR}/meta-altera/recipes-devtools/
+#fi
 
 TASK_NATIVE_SDK="gcc-symlinks g++-symlinks cpp cpp-symlinks binutils-symlinks \
 make virtual-libc-dev perl-modules flex flex-dev bison gawk sed grep autoconf \
@@ -222,7 +168,7 @@ libstdc++-dev autoconf libgomp libgomp-dev libgomp-staticdev"
 
 PYTHON_PACKAGES="python python-modules python-sqlite3"
 
-BUILD_PACKAGES="${PYTHON_PACKAGES} bash perl gator gdbserver glibc-utils \
+BUILD_PACKAGES="${PYTHON_PACKAGES} bash perl gdbserver glibc-utils \
 glibc-dev gdb binutils gcc g++ make dtc ldd curl rsync vim"
 
 CONNMAN_PACKAGES="connman connman-client connman-tests connman-tools"
@@ -275,27 +221,6 @@ fi
 
 ##############
 
-if [ "${ANGSTROM_VER}" = "v2014.12" ]; then
-    # Fix connman boot from NFS issue
-    # http://www.ptrackapp.com/apclassys-notes/embedded-linux-using-connma/
-    # http://developer.toradex.com/software-re${LAYERS_SUBDIR}/arm-family/linux/linux-booting
-    #  fix it as documented in http://rocketboards.org/foswiki/Documentation/AngstromOnSoCFPGA_1 [case:209754]
-    sed -i -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(ExecStart=/usr/sbin/connmand -n\\)\\\$#\\1 -I eth0#" \${S}/src/connman.service,' ${LAYERS_SUBDIR}/openembedded-core/meta/recipes-connectivity/connman/connman.inc
-elif [ "${ANGSTROM_VER}" = "v2015.12" ]; then
-    # as documented in [case:404248]
-    sed -i.orig -e 's,\(sed -i.*ExecStart.*\)$,\1\n\tsed -i "s#\\(Wants=network.target.*\\)\\\$#\\1\\nConditionKernelCommandLine=!root=/dev/nfs#" \${B}/src/connman.service,' ${LAYERS_SUBDIR}/openembedded-core/meta/recipes-connectivity/connman/connman.inc
-fi
-
-# qspi boot on rocketboards says to add this
-# require recipes-images/angstrom/console-image.bb
-
-# 
-# add soceds initramfs image
-# core-image-minimal replaced with core-image-small, see:
-#https://www.safaribooksonline.com/library/view/embedded-linux-projects/9781784395186/ch03s13.html
-# initscripts removed - Nov 2
-# connman connman-client - Nov 6th
-# aug 16 swich from core-imaga-small.bb to core image-minimal-mtdutils.bb
 
 mkdir -p ${LAYERS_SUBDIR}/meta-altera/recipes-images/angstrom
 cp -v ../core-image-small.bb ${LAYERS_SUBDIR}/openembedded-core/meta/recipes-core/images
@@ -304,7 +229,7 @@ require recipes-core/images/core-image-minimal-mtdutils.bb
 
 DESCRIPTION = "Small image suitable for initramfs boot."
 
-IMAGE_INSTALL += "openssh gdbserver uuid mtd-utils gator connman connman-client"
+IMAGE_INSTALL += "openssh gdbserver uuid mtd-utils connman connman-client"
 
 ROOTFS_POSTPROCESS_COMMAND += "unset_root_password;"
 
@@ -337,19 +262,11 @@ if [ "${ENABLE_MTDUTILS_PATCH}" = "1" ]; then
     popd
 fi
 
-if [ "${ANGSTROM_VER}" = "v2014.12" ] || [ "${ANGSTROM_VER}" = "v2015.12" ]; then
-    export KBRANCH=socfpga-4.1.33-ltsi
-else
-    export KBRANCH=socfpga-4.9.51-ltsi
-fi
+export KBRANCH=socfpga-4.9.78-ltsi
+export LINUX_VERSION=4.9.78
 export KERNEL_PROVIDER=linux-altera-ltsi
 
 MACHINE=${ANGSTROM_MACH} bitbake console-image
-
-#MACHINE=${ANGSTROM_MACH} bitbake -c clean console-image
-#MACHINE=${ANGSTROM_MACH} bitbake -c clean virtual/kernel
-#rm -rf deploy/glibc/images/socfpga/README_-_DO_NOT_DELETE_FILES_IN_THIS_DIRECTORY.txt
-#rm -rf deploy/glibc/images/socfpga/*.dtb
 
 echo "[JDS] about to bitbake soceds-initramfs"
 
